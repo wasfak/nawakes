@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { SignInButton } from "@clerk/nextjs";
 import { CheckCircle2, Clock, LogIn, Users } from "lucide-react";
+import { CustomRequest, type CustomItem } from "@/models/CustomRequest";
+import { CustomRequestsAdmin } from "@/components/custom-requests-admin";
 import { checkAdmin } from "@/lib/admin";
 
 import { Button } from "@/components/ui/button";
@@ -94,12 +96,12 @@ export default async function DashboardPage({ searchParams }: Props) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Orders dashboard</h1>
           <p className="text-sm text-muted-foreground">
-            {orders.length.toLocaleString()} order
+            {orders.length.toLocaleString("en-US")} order
             {orders.length === 1 ? "" : "s"} &middot;{" "}
-            {totalItems.toLocaleString()} line item
+            {totalItems.toLocaleString("en-US")} line item
             {totalItems === 1 ? "" : "s"}
             {totalIgnored > 0 && (
-              <> &middot; {totalIgnored.toLocaleString()} ignored</>
+              <> &middot; {totalIgnored.toLocaleString("en-US")} ignored</>
             )}
           </p>
         </div>
@@ -176,7 +178,7 @@ export default async function DashboardPage({ searchParams }: Props) {
               orderedQty: item.quantity,
               originalQty: original,
               changed,
-              date: new Date(order.updatedAt).toLocaleDateString(),
+              date: new Date(order.updatedAt).toLocaleDateString("en-US"),
             });
           }
 
@@ -196,7 +198,7 @@ export default async function DashboardPage({ searchParams }: Props) {
                 orderedQty: null,
                 originalQty: original,
                 changed: false,
-                date: new Date(order.updatedAt).toLocaleDateString(),
+                date: new Date(order.updatedAt).toLocaleDateString("en-US"),
               });
             }
           }
@@ -295,6 +297,36 @@ export default async function DashboardPage({ searchParams }: Props) {
           </DashboardSection>
         );
       })}
+
+      <CustomRequestsServerData />
     </div>
   );
+}
+
+async function CustomRequestsServerData() {
+  await connectDB();
+  const customRequests = await CustomRequest.find({ "items.0": { $exists: true } })
+    .sort({ updatedAt: -1 })
+    .lean<
+      {
+        userId: string;
+        userName: string;
+        items: CustomItem[];
+        updatedAt: Date;
+      }[]
+    >();
+
+  const serialized = customRequests.map((r) => ({
+    userId: r.userId,
+    userName: r.userName || "Unknown",
+    items: r.items.map((it) => ({
+      name: it.name,
+      quantity: it.quantity,
+      approvedQty: it.approvedQty ?? null,
+      completed: it.completed ?? false,
+    })),
+    updatedAt: r.updatedAt.toISOString(),
+  }));
+
+  return <CustomRequestsAdmin requests={serialized} />;
 }

@@ -13,6 +13,7 @@ type NavItem = {
 
 const allNavItems: NavItem[] = [
   { value: "home", label: "Home", href: "/", icon: "home" },
+  { value: "my-requests", label: "My requests", href: "/my-requests", icon: "home" },
   { value: "dashboard", label: "Dashboard", href: "/dashboard", icon: "home", adminOnly: true },
   { value: "upload", label: "Upload", href: "/upload", icon: "home", adminOnly: true },
 ];

@@ -11,15 +11,23 @@ export function isAdminEmail(email: string | null | undefined): boolean {
   return adminEmails.includes(email.toLowerCase());
 }
 
-// cache() deduplicates within a single request — layout + page calling
-// checkAdmin() only hits Clerk once.
-export const checkAdmin = cache(async (): Promise<boolean> => {
-  const { userId } = await auth();
-  if (!userId) return false;
-  const client = await clerkClient();
-  const user = await client.users.getUser(userId);
-  const email =
-    user.primaryEmailAddress?.emailAddress ??
-    user.emailAddresses[0]?.emailAddress;
-  return isAdminEmail(email);
-});
+// Raw check — safe to call from route handlers / server actions.
+export async function isAdmin(): Promise<boolean> {
+  try {
+    const { userId } = await auth();
+    if (!userId) return false;
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const email =
+      user.primaryEmailAddress?.emailAddress ??
+      user.emailAddresses[0]?.emailAddress;
+    return isAdminEmail(email);
+  } catch (e) {
+    console.error("isAdmin check failed:", e);
+    return false;
+  }
+}
+
+// cache() deduplicates within a single render pass (layout + page).
+// Use only from Server Components.
+export const checkAdmin = cache(isAdmin);

@@ -202,16 +202,14 @@ export function DataTable({
         setMenu(null);
     };
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenu(null);
-    const onScroll = () => setMenu(null);
+    const onResize = () => setMenu(null);
     document.addEventListener("mousedown", onDown);
     document.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, true);
-    window.addEventListener("resize", onScroll);
+    window.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("mousedown", onDown);
       document.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll, true);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", onResize);
     };
   }, [menu]);
 

@@ -15,6 +15,7 @@ import {
 import { dateRange } from "@/lib/date-filter";
 import { OrderTable } from "@/components/order-table";
 import { DateFilter } from "@/components/date-filter";
+import { CustomRequestForm } from "@/components/custom-request-form";
 
 export const dynamic = "force-dynamic";
 
@@ -134,7 +135,7 @@ export default async function Page({ searchParams }: Props) {
     );
   }
 
-  // ── List view: fetch only metadata (no row data) ──
+  // ── List view ──
   const datasetDocs = await Dataset.find(
     { createdAt: dateRange(from, to) },
     { fileName: 1, columns: 1, createdAt: 1 },
@@ -197,12 +198,28 @@ export default async function Page({ searchParams }: Props) {
                   {d.columns.length} columns
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(d.createdAt).toLocaleString()}
+                  {new Date(d.createdAt).toLocaleDateString("en-US")}
                 </p>
               </div>
             </Link>
           );
         })}
+      </div>
+
+      {/* Custom request */}
+      <div className="border-t pt-5">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Custom request</h2>
+            <p className="text-sm text-muted-foreground">
+              Need something not on the sheets? Add items manually.
+            </p>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/my-requests">View request status</Link>
+          </Button>
+        </div>
+        <CustomRequestForm />
       </div>
     </div>
   );
