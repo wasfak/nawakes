@@ -11,6 +11,7 @@ export interface OrderDoc {
   userName: string;
   datasetId: Types.ObjectId;
   items: OrderItem[];
+  ignored: number[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -29,6 +30,7 @@ const OrderSchema = new Schema(
     userName: { type: String, default: "" },
     datasetId: { type: Schema.Types.ObjectId, ref: "Dataset", required: true },
     items: { type: [OrderItemSchema], default: [] },
+    ignored: { type: [Number], default: [] },
   },
   { timestamps: true }
 );

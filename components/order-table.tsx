@@ -14,6 +14,7 @@ interface OrderTableProps {
   numericColumns: string[];
   quantityColumn: string | null;
   initialItems: { index: number; quantity: number }[];
+  initialIgnored: number[];
 }
 
 export function OrderTable({
@@ -23,13 +24,13 @@ export function OrderTable({
   numericColumns,
   quantityColumn,
   initialItems,
+  initialIgnored,
 }: OrderTableProps) {
   const numericSet = React.useMemo(
     () => new Set(numericColumns),
     [numericColumns]
   );
 
-  // Original quantity per row id, used as the default and to detect changes.
   const originalQty = React.useMemo(() => {
     const map: Record<string, number> = {};
     if (quantityColumn) {
@@ -48,6 +49,9 @@ export function OrderTable({
       return q;
     }
   );
+  const [ignored, setIgnored] = React.useState<Set<string>>(
+    () => new Set(initialIgnored.map(String))
+  );
   const [saving, setSaving] = React.useState(false);
 
   const toggle = (id: string) =>
@@ -64,6 +68,22 @@ export function OrderTable({
       return next;
     });
 
+  const toggleIgnore = (id: string) =>
+    setIgnored((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        setSelected((s) => {
+          const ns = new Set(s);
+          ns.delete(id);
+          return ns;
+        });
+      }
+      return next;
+    });
+
   const save = async () => {
     setSaving(true);
     try {
@@ -71,17 +91,20 @@ export function OrderTable({
         index: Number(id),
         quantity: quantities[id] ?? originalQty[id] ?? 0,
       }));
+      const ignoredList = [...ignored].map(Number);
       const res = await fetch("/api/orders", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ datasetId, items }),
+        body: JSON.stringify({ datasetId, items, ignored: ignoredList }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Could not save your order.");
       toast.success(
         items.length
-          ? `Order saved — ${items.length} item${items.length === 1 ? "" : "s"}. Visit the Dashboard to review.`
-          : "Order cleared."
+          ? `Order saved — ${items.length} item${items.length === 1 ? "" : "s"}${ignoredList.length ? `, ${ignoredList.length} ignored` : ""}. Visit the Dashboard to review.`
+          : ignoredList.length
+            ? `Order saved — ${ignoredList.length} item${ignoredList.length === 1 ? "" : "s"} ignored.`
+            : "Order cleared."
       );
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save your order.");
@@ -95,6 +118,7 @@ export function OrderTable({
       columns={columns}
       rows={rows}
       numericColumns={numericSet}
+      storageKey={`order-${datasetId}`}
       selection={{
         selectedIds: selected,
         onToggle: toggle,
@@ -111,14 +135,19 @@ export function OrderTable({
             }
           : undefined
       }
+      ignorable={{
+        ignoredIds: ignored,
+        onToggle: toggleIgnore,
+      }}
       rightToolbar={
         <div className="flex items-center gap-3">
           <span className="text-sm text-muted-foreground">
             {selected.size} selected
+            {ignored.size > 0 && ` · ${ignored.size} ignored`}
           </span>
           <Button onClick={save} disabled={saving}>
             {saving ? <Loader2 className="animate-spin" /> : <ShoppingCart />}
-            {saving ? "Saving…" : "Save order"}
+            {saving ? "Saving..." : "Save order"}
           </Button>
         </div>
       }

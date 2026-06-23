@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@clerk/nextjs/server";
 import { SignInButton } from "@clerk/nextjs";
-import { LogIn } from "lucide-react";
+import { CheckCircle2, Clock, LogIn, Users } from "lucide-react";
+import { checkAdmin } from "@/lib/admin";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -14,6 +16,10 @@ import {
   stringify,
   type DataRow,
 } from "@/lib/dataset";
+import { dateRange } from "@/lib/date-filter";
+import { DateFilter } from "@/components/date-filter";
+import { DashboardSection } from "@/components/dashboard-section";
+import { DashboardTable, type DashboardRow } from "@/components/dashboard-table";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +28,7 @@ type DatasetLean = {
   fileName: string;
   columns: string[];
   rows: DatasetRow[];
+  createdAt: Date;
 };
 
 type OrderLean = {
@@ -29,10 +36,13 @@ type OrderLean = {
   userName: string;
   datasetId: { toString(): string };
   items: OrderItem[];
+  ignored?: number[];
   updatedAt: Date;
 };
 
-export default async function DashboardPage() {
+type Props = { searchParams: Promise<{ from?: string; to?: string }> };
+
+export default async function DashboardPage({ searchParams }: Props) {
   const { userId } = await auth();
 
   if (!userId) {
@@ -56,18 +66,27 @@ export default async function DashboardPage() {
     );
   }
 
-  await connectDB();
-  const orders = await Order.find()
-    .sort({ updatedAt: -1 })
-    .lean<OrderLean[]>();
+  if (!(await checkAdmin())) redirect("/");
 
-  const datasetIds = [...new Set(orders.map((o) => o.datasetId.toString()))];
-  const datasets = datasetIds.length
-    ? await Dataset.find({ _id: { $in: datasetIds } }).lean<DatasetLean[]>()
+  const { from, to } = await searchParams;
+
+  await connectDB();
+  const datasets = await Dataset.find({
+    createdAt: dateRange(from, to),
+  })
+    .sort({ createdAt: -1 })
+    .lean<DatasetLean[]>();
+
+  const datasetIds = datasets.map((d) => d._id.toString());
+
+  const orders = datasetIds.length
+    ? await Order.find({ datasetId: { $in: datasetIds } })
+        .sort({ updatedAt: -1 })
+        .lean<OrderLean[]>()
     : [];
-  const dsMap = new Map(datasets.map((d) => [d._id.toString(), d]));
 
   const totalItems = orders.reduce((n, o) => n + o.items.length, 0);
+  const totalIgnored = orders.reduce((n, o) => n + (o.ignored?.length ?? 0), 0);
 
   return (
     <div className="mx-auto w-full max-w-7xl space-y-6 p-6">
@@ -76,8 +95,12 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight">Orders dashboard</h1>
           <p className="text-sm text-muted-foreground">
             {orders.length.toLocaleString()} order
-            {orders.length === 1 ? "" : "s"} · {totalItems.toLocaleString()} line
-            item{totalItems === 1 ? "" : "s"}
+            {orders.length === 1 ? "" : "s"} &middot;{" "}
+            {totalItems.toLocaleString()} line item
+            {totalItems === 1 ? "" : "s"}
+            {totalIgnored > 0 && (
+              <> &middot; {totalIgnored.toLocaleString()} ignored</>
+            )}
           </p>
         </div>
         <Button asChild variant="outline" size="sm">
@@ -85,118 +108,191 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {orders.length === 0 && (
+      <DateFilter />
+
+      {datasets.length === 0 && (
         <p className="rounded-xl border border-border p-10 text-center text-muted-foreground">
-          No orders yet. Go to the{" "}
-          <Link href="/" className="text-primary underline-offset-4 hover:underline">
-            home page
-          </Link>{" "}
-          to mark items and save an order.
+          No data found for the selected date range.
         </p>
       )}
 
-      {/* Group by dataset (catalog). */}
-      {datasetIds.map((dsId) => {
-        const ds = dsMap.get(dsId);
-        if (!ds) return null;
-
+      {datasets.map((ds) => {
+        const dsId = ds._id.toString();
         const groupOrders = orders.filter((o) => o.datasetId.toString() === dsId);
         const { columns, rows, fileName } = ds;
         const dataRows: DataRow[] = rows.map((r, i) => ({ ...r, __id: String(i) }));
         const numericColumns = columns.filter((c) => isNumericColumn(dataRows, c));
-        const numericSet = new Set(numericColumns);
         const quantityColumn = detectQuantityColumn(columns, numericColumns);
 
-        return (
-          <section key={dsId} className="space-y-2">
-            <h2 className="font-semibold">{fileName}</h2>
-            <div className="overflow-auto rounded-xl border border-border">
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-card">
-                  <tr>
-                    <th className="border-b border-border px-3 py-2 text-center font-semibold">
-                      Ordered by
-                    </th>
-                    {columns.map((col) => (
-                      <th
-                        key={col}
-                        className="border-b border-border px-3 py-2 text-center font-semibold"
-                      >
-                        {col}
-                      </th>
-                    ))}
-                    <th className="border-b border-border px-3 py-2 text-center font-semibold">
-                      Ordered qty
-                    </th>
-                    <th className="border-b border-border px-3 py-2 text-center font-semibold">
-                      Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupOrders.flatMap((order) =>
-                    order.items.map((item) => {
-                      const row = rows[item.index];
-                      if (!row) return null;
-                      const original = quantityColumn
-                        ? Number(row[quantityColumn]) || 0
-                        : null;
-                      const changed =
-                        original !== null && item.quantity !== original;
+        // Detect المسئول column and build responder list
+        const responsibleCol = columns.find((c) =>
+          /مسئول|مسؤول|responsible/i.test(c)
+        );
+        let responsibleNames: string[] = [];
+        const respondedResponsibles = new Set<string>();
 
-                      return (
-                        <tr
-                          key={`${order.userId}-${item.index}`}
-                          className="border-b border-border last:border-0 hover:bg-muted/40"
+        const orderedIndices = new Set<number>();
+        const ignoredIndices = new Set<number>();
+        for (const o of groupOrders) {
+          for (const item of o.items) orderedIndices.add(item.index);
+          if (o.ignored) for (const idx of o.ignored) ignoredIndices.add(idx);
+        }
+
+        if (responsibleCol) {
+          const nameSet = new Set<string>();
+          for (const row of rows) {
+            const v = stringify(row[responsibleCol]).trim();
+            if (v) nameSet.add(v);
+          }
+          responsibleNames = [...nameSet].sort((a, b) =>
+            a.localeCompare(b, undefined, { sensitivity: "base" })
+          );
+          const allTouched = new Set([...orderedIndices, ...ignoredIndices]);
+          for (const idx of allTouched) {
+            const row = rows[idx];
+            if (!row) continue;
+            const v = stringify(row[responsibleCol]).trim();
+            if (v) respondedResponsibles.add(v);
+          }
+        }
+
+        // Build ALL rows for the table
+        const tableRows: DashboardRow[] = [];
+
+        // Ordered items
+        for (const order of groupOrders) {
+          for (const item of order.items) {
+            const row = rows[item.index];
+            if (!row) continue;
+            const original = quantityColumn
+              ? Number(row[quantityColumn]) || 0
+              : null;
+            const changed = original !== null && item.quantity !== original;
+            tableRows.push({
+              key: `${order.userId}-item-${item.index}`,
+              userName: order.userName || "Unknown",
+              status: "ordered",
+              cells: row as Record<string, string | number | null>,
+              orderedQty: item.quantity,
+              originalQty: original,
+              changed,
+              date: new Date(order.updatedAt).toLocaleDateString(),
+            });
+          }
+
+          // Ignored items
+          if (order.ignored) {
+            for (const idx of order.ignored) {
+              const row = rows[idx];
+              if (!row) continue;
+              const original = quantityColumn
+                ? Number(row[quantityColumn]) || 0
+                : null;
+              tableRows.push({
+                key: `${order.userId}-ignored-${idx}`,
+                userName: order.userName || "Unknown",
+                status: "ignored",
+                cells: row as Record<string, string | number | null>,
+                orderedQty: null,
+                originalQty: original,
+                changed: false,
+                date: new Date(order.updatedAt).toLocaleDateString(),
+              });
+            }
+          }
+        }
+
+        // Unreplied rows (not ordered, not ignored by anyone)
+        for (let i = 0; i < rows.length; i++) {
+          if (orderedIndices.has(i) || ignoredIndices.has(i)) continue;
+          const row = rows[i];
+          const original = quantityColumn
+            ? Number(row[quantityColumn]) || 0
+            : null;
+          tableRows.push({
+            key: `none-${i}`,
+            userName: "—",
+            status: "none",
+            cells: row as Record<string, string | number | null>,
+            orderedQty: null,
+            originalQty: original,
+            changed: false,
+            date: "—",
+          });
+        }
+
+        // Export data
+        const exportData: Record<string, unknown>[] = [];
+        for (const order of groupOrders) {
+          for (const item of order.items) {
+            const row = rows[item.index];
+            if (!row) continue;
+            const exportRow: Record<string, unknown> = { ...row };
+            if (quantityColumn) exportRow[quantityColumn] = item.quantity;
+            exportData.push(exportRow);
+          }
+        }
+
+        return (
+          <DashboardSection key={dsId} datasetId={dsId} fileName={fileName} exportData={exportData}>
+            {/* Responder tracker */}
+            {responsibleNames.length > 0 && (
+              <div className="rounded-xl border border-border p-4">
+                <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+                  <Users className="size-4 text-muted-foreground" />
+                  <span>
+                    Responders &middot;{" "}
+                    {responsibleNames.filter((n) =>
+                      respondedResponsibles.has(n)
+                    ).length}{" "}
+                    / {responsibleNames.length}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {responsibleNames.map((name) => {
+                    const responded = respondedResponsibles.has(name);
+                    return (
+                      <div
+                        key={name}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors",
+                          responded
+                            ? "border-green-500/30 bg-green-500/10 text-green-600 dark:text-green-400"
+                            : "border-border bg-muted/40 text-muted-foreground"
+                        )}
+                      >
+                        {responded ? (
+                          <CheckCircle2 className="size-3.5" />
+                        ) : (
+                          <Clock className="size-3.5" />
+                        )}
+                        <span className={cn(!responded && "opacity-70")}>
+                          {name}
+                        </span>
+                        <span
+                          className={cn(
+                            "text-xs",
+                            responded
+                              ? "text-green-600/70 dark:text-green-400/70"
+                              : "text-muted-foreground/60"
+                          )}
                         >
-                          <td className="px-3 py-2 text-center font-medium">
-                            {order.userName || "Unknown"}
-                          </td>
-                          {columns.map((col) => {
-                            const numeric = numericSet.has(col);
-                            const empty = stringify(row[col]) === "";
-                            return (
-                              <td
-                                key={col}
-                                className={cn(
-                                  "px-3 py-2 text-center align-top",
-                                  numeric && "tabular-nums"
-                                )}
-                              >
-                                {empty ? (
-                                  <span className="text-muted-foreground/40">—</span>
-                                ) : numeric ? (
-                                  Number(row[col]).toLocaleString()
-                                ) : (
-                                  String(row[col])
-                                )}
-                              </td>
-                            );
-                          })}
-                          <td
-                            className={cn(
-                              "px-3 py-2 text-center font-semibold tabular-nums",
-                              changed && "text-primary"
-                            )}
-                          >
-                            {item.quantity.toLocaleString()}
-                            {changed && (
-                              <span className="block text-xs font-normal text-muted-foreground">
-                                was {original!.toLocaleString()}
-                              </span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-center text-muted-foreground">
-                            {new Date(order.updatedAt).toLocaleDateString()}
-                          </td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                          {responded ? "Responded" : "Pending"}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <DashboardTable
+              columns={columns}
+              numericColumns={numericColumns}
+              quantityColumn={quantityColumn}
+              rows={tableRows}
+            />
+          </DashboardSection>
         );
       })}
     </div>

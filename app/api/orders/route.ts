@@ -18,9 +18,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { datasetId, items } = (body ?? {}) as {
+  const { datasetId, items, ignored } = (body ?? {}) as {
     datasetId?: string;
     items?: OrderItem[];
+    ignored?: number[];
   };
 
   if (!datasetId || !Types.ObjectId.isValid(datasetId) || !Array.isArray(items)) {
@@ -38,6 +39,9 @@ export async function POST(req: Request) {
     )
     .map((it) => ({ index: it.index, quantity: Number(it.quantity) }));
 
+  const cleanIgnored = (Array.isArray(ignored) ? ignored : [])
+    .filter((i) => Number.isInteger(i) && i >= 0);
+
   const user = await currentUser();
   const userName =
     user?.fullName ||
@@ -48,7 +52,7 @@ export async function POST(req: Request) {
   await connectDB();
   await Order.findOneAndUpdate(
     { userId, datasetId },
-    { userId, userName, datasetId, items: cleanItems },
+    { userId, userName, datasetId, items: cleanItems, ignored: cleanIgnored },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
