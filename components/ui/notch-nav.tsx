@@ -147,16 +147,16 @@ export function NotchNav({
   );
 
   return (
-    <header className="relative flex w-full items-center justify-between gap-3 px-3 py-3 sm:px-4 sm:py-4 min-h-14 sm:min-h-16">
+    <div className="relative grid grid-cols-[1fr_auto] md:grid-cols-[1fr_auto_1fr] w-full items-center gap-2 px-3 py-3 sm:gap-3 sm:px-4 sm:py-4 min-h-14 sm:min-h-16">
       {/* Brand */}
-      <Link href="/" className="shrink-0">
+      <Link href="/" className="justify-self-start inline-flex shrink-0 min-w-0">
         <BrandLogo />
       </Link>
 
       {/* Desktop nav — hidden on mobile */}
       <nav
         aria-label={ariaLabel}
-        className={["hidden md:block shrink-0", className].filter(Boolean).join(" ")}
+        className={["hidden md:block justify-self-center", className].filter(Boolean).join(" ")}
       >
         <div
           ref={containerRef}
@@ -295,32 +295,36 @@ export function NotchNav({
         </div>
       </nav>
 
-      {/* Desktop right side — hidden on mobile */}
-      <div className="hidden md:flex items-center gap-3">
-        <ThemeToggle />
-        {authButtons}
-      </div>
+      {/* Right side actions */}
+      <div className="justify-self-end flex items-center gap-2 sm:gap-3">
+        {/* Desktop — hidden on mobile */}
+        <div className="hidden md:flex items-center gap-3">
+          <ThemeToggle />
+          {authButtons}
+        </div>
 
-      {/* Mobile right side — visible only on mobile */}
-      <div className="flex md:hidden items-center gap-2">
-        <ThemeToggle />
-        <button
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          className="inline-flex items-center justify-center rounded-md p-1.5 text-foreground/70 hover:text-foreground hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring outline-none"
-        >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        {/* Mobile — visible only on mobile */}
+        <div className="flex md:hidden items-center gap-2">
+          <ThemeToggle />
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-expanded={mobileOpen}
+            className="inline-flex items-center justify-center rounded-md p-1.5 text-foreground/70 hover:text-foreground hover:bg-muted transition-colors focus-visible:ring-2 focus-visible:ring-ring outline-none"
+          >
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu overlay */}
       {mobileOpen && (
-        <div className="fixed inset-0 top-14 z-50 md:hidden">
+        <div className="md:hidden">
           <div
-            className="absolute inset-0 bg-background/80 backdrop-blur-sm"
+            className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
-          <div className="relative border-b border-border bg-card shadow-lg">
+          <div className="absolute left-0 right-0 top-full z-50 max-h-[calc(100vh-3.5rem)] overflow-y-auto border-b border-border bg-card shadow-lg">
             <nav aria-label={ariaLabel} className="flex flex-col gap-1 p-4">
               {items.map((item) => {
                 const isActive = item.value === active;
@@ -364,6 +368,6 @@ export function NotchNav({
           </div>
         </div>
       )}
-    </header>
+    </div>
   );
 }

@@ -88,7 +88,8 @@ function TextButton({
       <motion.div
         className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
         style={{
-          background: "linear-gradient(45deg, rgba(56, 189, 248, 0.35), rgba(168, 85, 247, 0.25), rgba(16, 185, 129, 0.25), rgba(251, 191, 36, 0.25))",
+          background:
+            "linear-gradient(45deg, rgba(56, 189, 248, 0.35), rgba(168, 85, 247, 0.25), rgba(16, 185, 129, 0.25), rgba(251, 191, 36, 0.25))",
           backgroundSize: "300% 300%",
           padding: "1px",
         }}
@@ -224,7 +225,7 @@ export function AuthActionButton({
 }
 
 export function BrandLogo({
-  text = "WaSfY",
+  text = "Aya/WaSfY/NaBil",
   className,
 }: {
   text?: string;

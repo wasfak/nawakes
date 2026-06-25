@@ -168,11 +168,11 @@ export default async function Page({ searchParams }: Props) {
       <DateFilter />
 
       {allDatasets.length === 0 && (
-        <Button asChild>
-          <Link href="/upload">
-            <Upload /> Go to upload
-          </Link>
-        </Button>
+        <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-10 text-center">
+          <p className="text-sm text-muted-foreground">
+            No sheets found for the selected date range.
+          </p>
+        </div>
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -210,7 +210,9 @@ export default async function Page({ searchParams }: Props) {
       <div className="border-t pt-5">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">Custom request</h2>
+            <h2 className="text-lg font-semibold tracking-tight">
+              Custom request
+            </h2>
             <p className="text-sm text-muted-foreground">
               Need something not on the sheets? Add items manually.
             </p>
