@@ -17,7 +17,12 @@ export async function PATCH(req: Request) {
 
   const { userId, items } = (body ?? {}) as {
     userId?: string;
-    items?: { name: string; approvedQty: number | null; completed: boolean }[];
+    items?: {
+      name: string;
+      approvedQty: number | null;
+      completed: boolean;
+      unavailable?: boolean;
+    }[];
   };
 
   if (!userId || !Array.isArray(items)) {
@@ -26,7 +31,13 @@ export async function PATCH(req: Request) {
 
   await connectDB();
   const doc = await CustomRequest.findOne({ userId }).lean<{
-    items: { name: string; quantity: number; approvedQty: number | null; completed: boolean }[];
+    items: {
+      name: string;
+      quantity: number;
+      approvedQty: number | null;
+      completed: boolean;
+      unavailable?: boolean;
+    }[];
   }>();
   if (!doc) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
@@ -45,6 +56,7 @@ export async function PATCH(req: Request) {
           : Number(u.approvedQty)
         : it.approvedQty ?? null,
       completed: u ? Boolean(u.completed) : it.completed ?? false,
+      unavailable: u ? Boolean(u.unavailable) : it.unavailable ?? false,
     };
   });
 

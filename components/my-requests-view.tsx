@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Ban,
   CheckCircle2,
   Clock,
   Loader2,
@@ -22,6 +23,7 @@ export interface MyRequestItem {
   quantity: number;
   approvedQty: number | null;
   completed: boolean;
+  unavailable: boolean;
 }
 
 interface MyRequestsViewProps {
@@ -38,6 +40,7 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "reduced", label: "Partial" },
   { key: "completed", label: "Completed" },
   { key: "rejected", label: "Rejected" },
+  { key: "unavailable", label: "تعذر" },
 ];
 
 const STATUS_STYLES: Record<
@@ -62,6 +65,10 @@ const STATUS_STYLES: Record<
   rejected: {
     badge: "bg-destructive/10 text-destructive border-destructive/30",
     icon: <XCircle className="size-3.5" />,
+  },
+  unavailable: {
+    badge: "bg-destructive/10 text-destructive border-destructive/30",
+    icon: <Ban className="size-3.5" />,
   },
   pending: {
     badge: "bg-muted text-muted-foreground border-border",
@@ -209,21 +216,22 @@ export function MyRequestsView({ items, updatedAt }: MyRequestsViewProps) {
           <tbody>
             {visible.map((it, i) => {
               const style = STATUS_STYLES[it.info.status];
-              const isResolved =
-                it.info.status === "completed" || it.info.status === "rejected";
+              const isRejectedLike =
+                it.info.status === "rejected" ||
+                it.info.status === "unavailable";
               return (
                 <tr
                   key={`${it.name}-${i}`}
                   className={cn(
                     "border-b border-border last:border-0 hover:bg-muted/40",
                     it.info.status === "completed" && "bg-green-500/5",
-                    it.info.status === "rejected" && "bg-destructive/5",
+                    isRejectedLike && "bg-destructive/5",
                   )}
                 >
                   <td
                     className={cn(
                       "px-3 py-2 text-center",
-                      isResolved && it.info.status === "rejected" && "line-through opacity-60",
+                      isRejectedLike && "line-through opacity-60",
                     )}
                   >
                     {it.name}

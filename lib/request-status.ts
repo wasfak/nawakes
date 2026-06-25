@@ -5,6 +5,7 @@ export type RequestStatus =
   | "approved"
   | "reduced"
   | "rejected"
+  | "unavailable"
   | "pending";
 
 export interface RequestStatusInfo {
@@ -15,8 +16,11 @@ export interface RequestStatusInfo {
 }
 
 export function getRequestStatus(item: CustomItem): RequestStatusInfo {
-  const { quantity, approvedQty, completed } = item;
+  const { quantity, approvedQty, completed, unavailable } = item;
 
+  if (unavailable) {
+    return { status: "unavailable", label: "تعذر", effectiveQty: 0 };
+  }
   if (completed) {
     return { status: "completed", label: "Completed", effectiveQty: approvedQty ?? quantity };
   }

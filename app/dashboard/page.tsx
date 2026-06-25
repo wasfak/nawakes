@@ -324,6 +324,7 @@ async function CustomRequestsServerData() {
       quantity: it.quantity,
       approvedQty: it.approvedQty ?? null,
       completed: it.completed ?? false,
+      unavailable: it.unavailable ?? false,
     })),
     updatedAt: r.updatedAt.toISOString(),
   }));

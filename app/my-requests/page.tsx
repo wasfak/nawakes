@@ -45,6 +45,7 @@ export default async function MyRequestsPage() {
     quantity: it.quantity,
     approvedQty: it.approvedQty ?? null,
     completed: it.completed ?? false,
+    unavailable: it.unavailable ?? false,
   }));
 
   return (

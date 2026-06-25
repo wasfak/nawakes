@@ -51,6 +51,7 @@ export async function POST(req: Request) {
       quantity: number;
       approvedQty: number | null;
       completed: boolean;
+      unavailable?: boolean;
     }[];
   }>();
 
@@ -63,6 +64,7 @@ export async function POST(req: Request) {
         quantity: it.quantity,
         approvedQty: it.approvedQty ?? null,
         completed: it.completed ?? false,
+        unavailable: it.unavailable ?? false,
       },
     ]),
   );
@@ -71,7 +73,7 @@ export async function POST(req: Request) {
     const prev = byName.get(it.name);
     if (prev) {
       // Update the requested quantity only while still pending (not yet handled).
-      if (prev.approvedQty === null && !prev.completed) {
+      if (prev.approvedQty === null && !prev.completed && !prev.unavailable) {
         prev.quantity = it.quantity;
       }
     } else {
@@ -80,6 +82,7 @@ export async function POST(req: Request) {
         quantity: it.quantity,
         approvedQty: null,
         completed: false,
+        unavailable: false,
       });
     }
   }

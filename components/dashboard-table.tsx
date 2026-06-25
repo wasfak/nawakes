@@ -32,7 +32,7 @@ export function DashboardTable({
   quantityColumn,
   rows,
 }: DashboardTableProps) {
-  const [view, setView] = React.useState<ViewMode>("all");
+  const [view, setView] = React.useState<ViewMode>("replied");
   const numericSet = new Set(numericColumns);
 
   const visible =

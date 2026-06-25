@@ -5,6 +5,8 @@ export interface CustomItem {
   quantity: number;
   approvedQty: number | null;
   completed: boolean;
+  /** تعذر — admin couldn't find this item. */
+  unavailable: boolean;
 }
 
 const CustomItemSchema = new Schema<CustomItem>(
@@ -13,6 +15,7 @@ const CustomItemSchema = new Schema<CustomItem>(
     quantity: { type: Number, required: true },
     approvedQty: { type: Number, default: null },
     completed: { type: Boolean, default: false },
+    unavailable: { type: Boolean, default: false },
   },
   { _id: false },
 );
