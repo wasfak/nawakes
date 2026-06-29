@@ -156,7 +156,9 @@ export default async function Page({ searchParams }: Props) {
     <div className="mx-auto w-full max-w-7xl space-y-5 p-6">
       <div className="flex flex-wrap items-end justify-between gap-3 border-b pb-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Home</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Searching Smarter, Supplying Faster
+          </h1>
           <p className="text-sm text-muted-foreground">
             {allDatasets.length
               ? `${allDatasets.length} sheet${allDatasets.length === 1 ? "" : "s"} found. Click one to view and order.`
