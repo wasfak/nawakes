@@ -22,6 +22,10 @@ import { dateRange } from "@/lib/date-filter";
 import { DateFilter } from "@/components/date-filter";
 import { DashboardSection } from "@/components/dashboard-section";
 import { DashboardTable, type DashboardRow } from "@/components/dashboard-table";
+import {
+  DashboardResetUsers,
+  type ResetUser,
+} from "@/components/dashboard-reset-users";
 
 export const dynamic = "force-dynamic";
 
@@ -223,6 +227,14 @@ export default async function DashboardPage({ searchParams }: Props) {
           });
         }
 
+        // Per-user submissions for the admin reset control
+        const resetUsers: ResetUser[] = groupOrders.map((o) => ({
+          userId: o.userId,
+          userName: o.userName || "Unknown",
+          itemCount: o.items.length,
+          ignoredCount: o.ignored?.length ?? 0,
+        }));
+
         // Export data
         const exportData: Record<string, unknown>[] = [];
         for (const order of groupOrders) {
@@ -230,13 +242,17 @@ export default async function DashboardPage({ searchParams }: Props) {
             const row = rows[item.index];
             if (!row) continue;
             const exportRow: Record<string, unknown> = { ...row };
-            if (quantityColumn) exportRow[quantityColumn] = item.quantity;
+            if (quantityColumn) {
+              const original = Number(row[quantityColumn]) || 0;
+              exportRow[quantityColumn] = item.quantity;
+              exportRow.__changed = item.quantity !== original;
+            }
             exportData.push(exportRow);
           }
         }
 
         return (
-          <DashboardSection key={dsId} datasetId={dsId} fileName={fileName} exportData={exportData}>
+          <DashboardSection key={dsId} datasetId={dsId} fileName={fileName} columns={columns} exportData={exportData}>
             {/* Responder tracker */}
             {responsibleNames.length > 0 && (
               <div className="rounded-xl border border-border p-4">
@@ -287,6 +303,13 @@ export default async function DashboardPage({ searchParams }: Props) {
                 </div>
               </div>
             )}
+
+            <DashboardResetUsers
+              datasetId={dsId}
+              users={resetUsers}
+              responsibleColumn={responsibleCol ?? null}
+              responsibleNames={responsibleNames}
+            />
 
             <DashboardTable
               columns={columns}

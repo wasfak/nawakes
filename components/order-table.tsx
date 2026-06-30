@@ -53,6 +53,12 @@ export function OrderTable({
     () => new Set(initialIgnored.map(String))
   );
   const [saving, setSaving] = React.useState(false);
+  const [confirmBulk, setConfirmBulk] = React.useState(false);
+
+  // Guard against the "select all + save" accident: flag a submit that covers
+  // (almost) the whole sheet so the user has to confirm it on purpose.
+  const isBulkSubmit =
+    rows.length > 5 && selected.size >= Math.ceil(rows.length * 0.9);
 
   const toggle = (id: string) =>
     setSelected((prev) => {
@@ -85,6 +91,7 @@ export function OrderTable({
     });
 
   const save = async () => {
+    setConfirmBulk(false);
     setSaving(true);
     try {
       const items = [...selected].map((id) => ({
@@ -145,10 +152,42 @@ export function OrderTable({
             {selected.size} selected
             {ignored.size > 0 && ` · ${ignored.size} ignored`}
           </span>
-          <Button onClick={save} disabled={saving}>
-            {saving ? <Loader2 className="animate-spin" /> : <ShoppingCart />}
-            {saving ? "Saving..." : "Save order"}
-          </Button>
+          {confirmBulk ? (
+            <div className="flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-1">
+              <span className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                Order all {selected.size} items?
+              </span>
+              <Button
+                size="sm"
+                className="h-7 px-3"
+                disabled={saving}
+                onClick={save}
+              >
+                {saving ? (
+                  <Loader2 className="size-3.5 animate-spin" />
+                ) : (
+                  "Yes, send"
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-3"
+                disabled={saving}
+                onClick={() => setConfirmBulk(false)}
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={() => (isBulkSubmit ? setConfirmBulk(true) : save())}
+              disabled={saving}
+            >
+              {saving ? <Loader2 className="animate-spin" /> : <ShoppingCart />}
+              {saving ? "Saving..." : "Save order"}
+            </Button>
+          )}
         </div>
       }
     />

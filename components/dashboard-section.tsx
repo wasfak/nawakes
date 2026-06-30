@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ChevronDown, ChevronUp, Download, Loader2, Trash2 } from "lucide-react";
@@ -11,15 +11,24 @@ import { Button } from "@/components/ui/button";
 interface DashboardSectionProps {
   datasetId: string;
   fileName: string;
+  columns: string[];
   exportData: Record<string, unknown>[];
   children: React.ReactNode;
 }
 
-const EXPORT_COLUMNS = ["المورد", "إسم الصنف", "الكميه", "السعر", "خصم اساسى"];
+const EXPORT_COLUMNS = ["المورد", "إسم الصنف", "الكميه", "السعر", "خصم"];
+
+function matchExportColumns(datasetColumns: string[]) {
+  return EXPORT_COLUMNS.flatMap((pattern) => {
+    const match = datasetColumns.find((c) => c.includes(pattern));
+    return match ? [match] : [];
+  });
+}
 
 export function DashboardSection({
   datasetId,
   fileName,
+  columns: datasetColumns,
   exportData,
   children,
 }: DashboardSectionProps) {
@@ -31,9 +40,10 @@ export function DashboardSection({
   const exportToExcel = () => {
     if (exportData.length === 0) return;
 
-    const allKeys = Object.keys(exportData[0]);
-    const cols = EXPORT_COLUMNS.filter((c) => allKeys.includes(c));
+    const cols = matchExportColumns(datasetColumns);
     if (cols.length === 0) return;
+
+    const changedFlags = exportData.map((row) => !!row.__changed);
 
     const rows = exportData.map((row) =>
       Object.fromEntries(cols.map((c) => [c, row[c] ?? ""]))
@@ -41,6 +51,19 @@ export function DashboardSection({
 
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(rows, { header: cols });
+
+    const changedFill = { fgColor: { rgb: "FFF3CD" } };
+    for (let r = 0; r < rows.length; r++) {
+      if (!changedFlags[r]) continue;
+      for (let c = 0; c < cols.length; c++) {
+        const addr = XLSX.utils.encode_cell({ r: r + 1, c });
+        const cell = ws[addr];
+        if (cell) {
+          cell.s = { fill: changedFill };
+        }
+      }
+    }
+
     XLSX.utils.book_append_sheet(wb, ws, "Orders");
 
     const name = fileName.replace(/\.[^.]+$/, "");

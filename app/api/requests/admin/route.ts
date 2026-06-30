@@ -64,3 +64,40 @@ export async function PATCH(req: Request) {
 
   return NextResponse.json({ ok: true }, { status: 200 });
 }
+
+// Admin-only: delete a single requested item (by name) from a user's request.
+// If it was the last item, the whole request document is removed.
+export async function DELETE(req: Request) {
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const userId = searchParams.get("userId");
+  const name = searchParams.get("name");
+
+  if (!userId || !name) {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  await connectDB();
+  const doc = await CustomRequest.findOne({ userId });
+  if (!doc) {
+    return NextResponse.json({ error: "Not found." }, { status: 404 });
+  }
+
+  const before = doc.items.length;
+  doc.items = doc.items.filter((it: { name: string }) => it.name !== name);
+
+  if (doc.items.length === before) {
+    return NextResponse.json({ error: "Item not found." }, { status: 404 });
+  }
+
+  if (doc.items.length === 0) {
+    await doc.deleteOne();
+  } else {
+    await doc.save();
+  }
+
+  return NextResponse.json({ ok: true }, { status: 200 });
+}

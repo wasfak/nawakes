@@ -4,7 +4,15 @@ import * as React from "react";
 import * as XLSX from "xlsx";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, Download, Loader2, Package, Search, X } from "lucide-react";
+import {
+  Check,
+  Download,
+  Loader2,
+  Package,
+  Search,
+  Trash2,
+  X,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -34,6 +42,8 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
   const [saving, setSaving] = React.useState(false);
   const [hideCompleted, setHideCompleted] = React.useState(true);
   const [dirty, setDirty] = React.useState<Set<string>>(new Set());
+  const [confirmDelete, setConfirmDelete] = React.useState<string | null>(null);
+  const [deleting, setDeleting] = React.useState<string | null>(null);
   const [search, setSearch] = React.useState("");
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
@@ -62,6 +72,37 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
       ),
     );
     setDirty((prev) => new Set(prev).add(userId));
+  };
+
+  const deleteItem = async (userId: string, itemName: string) => {
+    const key = `${userId}::${itemName}`;
+    setDeleting(key);
+    try {
+      const res = await fetch(
+        `/api/requests/admin?userId=${encodeURIComponent(
+          userId,
+        )}&name=${encodeURIComponent(itemName)}`,
+        { method: "DELETE" },
+      );
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error ?? "Could not delete.");
+      toast.success(`Deleted "${itemName}".`);
+      setData((prev) =>
+        prev
+          .map((req) =>
+            req.userId === userId
+              ? { ...req, items: req.items.filter((it) => it.name !== itemName) }
+              : req,
+          )
+          .filter((req) => req.items.length > 0),
+      );
+      router.refresh();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not delete.");
+    } finally {
+      setDeleting(null);
+      setConfirmDelete(null);
+    }
   };
 
   const saveAll = async () => {
@@ -99,8 +140,9 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
   };
 
   const totalItems = data.reduce((n, r) => n + r.items.length, 0);
-  const completedCount = data.reduce(
-    (n, r) => n + r.items.filter((it) => it.completed).length,
+  // "Hide completed" also hides تعذر (unavailable) items, so the badge counts both.
+  const hiddenCount = data.reduce(
+    (n, r) => n + r.items.filter((it) => it.completed || it.unavailable).length,
     0,
   );
 
@@ -123,7 +165,7 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
       if (toT !== null && t > toT) return [];
 
       return req.items
-        .filter((it) => !hideCompleted || !it.completed)
+        .filter((it) => !hideCompleted || (!it.completed && !it.unavailable))
         .filter(
           (it) =>
             !q ||
@@ -187,9 +229,9 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
               className="size-4 accent-green-600 align-middle"
             />
             Hide completed
-            {completedCount > 0 && (
+            {hiddenCount > 0 && (
               <span className="text-xs text-muted-foreground">
-                ({completedCount})
+                ({hiddenCount})
               </span>
             )}
           </label>
@@ -276,6 +318,9 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
               <th className="border-b border-border px-3 py-2 text-center font-semibold">
                 تعذر
               </th>
+              <th className="border-b border-border px-3 py-2 text-center font-semibold">
+                Delete
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -350,18 +395,57 @@ export function CustomRequestsAdmin({ requests }: CustomRequestsAdminProps) {
                     className="size-4 accent-destructive align-middle"
                   />
                 </td>
+                <td className="px-3 py-2 text-center">
+                  {confirmDelete === `${userId}::${item.name}` ? (
+                    <div className="inline-flex items-center gap-1.5">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="h-7 px-2.5"
+                        disabled={deleting === `${userId}::${item.name}`}
+                        onClick={() => deleteItem(userId, item.name)}
+                      >
+                        {deleting === `${userId}::${item.name}` ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          "Yes"
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2.5"
+                        disabled={deleting === `${userId}::${item.name}`}
+                        onClick={() => setConfirmDelete(null)}
+                      >
+                        No
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() =>
+                        setConfirmDelete(`${userId}::${item.name}`)
+                      }
+                    >
+                      <Trash2 className="size-3.5" />
+                    </Button>
+                  )}
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-3 py-10 text-center text-muted-foreground"
                 >
                   {hasFilters
                     ? "No items match these filters."
-                    : hideCompleted && completedCount > 0
-                      ? "All requests are completed."
+                    : hideCompleted && hiddenCount > 0
+                      ? "All requests are completed or marked تعذر."
                       : "No custom requests."}
                 </td>
               </tr>
