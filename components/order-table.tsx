@@ -63,16 +63,39 @@ export function OrderTable({
   const toggle = (id: string) =>
     setSelected((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        // Selecting a row clears any "ignore" on it — the two are mutually
+        // exclusive, so a row can never end up both ordered and ignored.
+        setIgnored((ig) => {
+          if (!ig.has(id)) return ig;
+          const nig = new Set(ig);
+          nig.delete(id);
+          return nig;
+        });
+      }
       return next;
     });
 
-  const toggleMany = (ids: string[], checked: boolean) =>
+  const toggleMany = (ids: string[], checked: boolean) => {
     setSelected((prev) => {
       const next = new Set(prev);
       for (const id of ids) (checked ? next.add(id) : next.delete(id));
       return next;
     });
+    if (checked) {
+      // Select-all must also un-ignore the rows it selects, so nothing ends
+      // up both ordered and ignored.
+      setIgnored((ig) => {
+        let changed = false;
+        const nig = new Set(ig);
+        for (const id of ids) if (nig.delete(id)) changed = true;
+        return changed ? nig : ig;
+      });
+    }
+  };
 
   const toggleIgnore = (id: string) =>
     setIgnored((prev) => {

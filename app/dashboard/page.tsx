@@ -91,7 +91,10 @@ export default async function DashboardPage({ searchParams }: Props) {
         .lean<OrderLean[]>()
     : [];
 
-  const totalItems = orders.reduce((n, o) => n + o.items.length, 0);
+  const totalItems = orders.reduce((n, o) => {
+    const ig = new Set(o.ignored ?? []);
+    return n + o.items.filter((it) => !ig.has(it.index)).length;
+  }, 0);
   const totalIgnored = orders.reduce((n, o) => n + (o.ignored?.length ?? 0), 0);
 
   return (
@@ -167,7 +170,11 @@ export default async function DashboardPage({ searchParams }: Props) {
 
         // Ordered items
         for (const order of groupOrders) {
+          // Ignore wins: a row this user ignored must never render as ordered,
+          // even if legacy data has it in both arrays.
+          const orderIgnored = new Set(order.ignored ?? []);
           for (const item of order.items) {
+            if (orderIgnored.has(item.index)) continue;
             const row = rows[item.index];
             if (!row) continue;
             const original = quantityColumn
@@ -238,7 +245,9 @@ export default async function DashboardPage({ searchParams }: Props) {
         // Export data
         const exportData: Record<string, unknown>[] = [];
         for (const order of groupOrders) {
+          const orderIgnored = new Set(order.ignored ?? []);
           for (const item of order.items) {
+            if (orderIgnored.has(item.index)) continue;
             const row = rows[item.index];
             if (!row) continue;
             const exportRow: Record<string, unknown> = { ...row };

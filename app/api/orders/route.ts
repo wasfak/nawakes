@@ -45,6 +45,11 @@ export async function POST(req: Request) {
   const cleanIgnored = (Array.isArray(ignored) ? ignored : [])
     .filter((i) => Number.isInteger(i) && i >= 0);
 
+  // An index can never be both ordered and ignored. If the client sends both,
+  // ignore wins — drop it from the ordered items so it can't show as ordered.
+  const ignoredSet = new Set(cleanIgnored);
+  const dedupedItems = cleanItems.filter((it) => !ignoredSet.has(it.index));
+
   const user = await currentUser();
   const userName =
     user?.fullName ||
@@ -55,11 +60,11 @@ export async function POST(req: Request) {
   await connectDB();
   await Order.findOneAndUpdate(
     { userId, datasetId },
-    { userId, userName, datasetId, items: cleanItems, ignored: cleanIgnored },
+    { userId, userName, datasetId, items: dedupedItems, ignored: cleanIgnored },
     { upsert: true, new: true, setDefaultsOnInsert: true }
   );
 
-  return NextResponse.json({ ok: true, count: cleanItems.length }, { status: 200 });
+  return NextResponse.json({ ok: true, count: dedupedItems.length }, { status: 200 });
 }
 
 // Admin-only: trim a user's order down to the rows they are actually
